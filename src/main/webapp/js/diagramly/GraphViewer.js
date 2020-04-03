@@ -320,15 +320,12 @@ GraphViewer.prototype.init = function(container, xmlNode, graphConfig)
 				
 				this.graph.customLinkClicked = function(href)
 				{
-					var done = true;
-					
 					if (href.substring(0, 13) == 'data:page/id,')
 					{
 						var comma = href.indexOf(',');
 						
 						if (!self.selectPageById(href.substring(comma + 1)))
 						{
-							done = false;
 							alert(mxResources.get('pageNotFound') || 'Page not found');
 						}
 					}
@@ -337,7 +334,7 @@ GraphViewer.prototype.init = function(container, xmlNode, graphConfig)
 						this.handleCustomLink(href);
 					}
 					
-					return done;
+					return true;
 				};
 				
 				this.fireEvent(new mxEventObject('render'));
@@ -549,6 +546,10 @@ GraphViewer.prototype.addSizeHandler = function()
 						this.toolbar.style.top = r.top + 'px';
 					}
 				}
+			}
+			else if (this.toolbar != null)
+			{
+				this.toolbar.style.width = Math.max(this.minToolbarWidth, container.offsetWidth) + 'px';
 			}
 			
 			updatingOverflow = false;
@@ -1842,7 +1843,8 @@ GraphViewer.getUrl = function(url, onload, onerror)
 	}
 	else
 	{
-		var xhr = (navigator.userAgent.indexOf('MSIE 9') > 0) ? new XDomainRequest() : new XMLHttpRequest();
+		var xhr = (navigator.userAgent != null && navigator.userAgent.indexOf('MSIE 9') > 0) ?
+			new XDomainRequest() : new XMLHttpRequest();
 		xhr.open('GET', url);
 		
 	    xhr.onload = function()

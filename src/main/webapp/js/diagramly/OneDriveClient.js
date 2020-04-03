@@ -1,6 +1,6 @@
 /**
- * Copyright (c) 2006-2017, JGraph Ltd
- * Copyright (c) 2006-2017, Gaudenz Alder
+ * Copyright (c) 2006-2020, JGraph Ltd
+ * Copyright (c) 2006-2020, draw.io AG
  */
 OneDriveClient = function(editorUi)
 {
@@ -30,6 +30,8 @@ mxUtils.extend(OneDriveClient, DrawioClient);
 OneDriveClient.prototype.clientId = window.DRAWIO_MSGRAPH_CLIENT_ID || ((window.location.hostname == 'test.draw.io') ?
 	'2e598409-107f-4b59-89ca-d7723c8e00a4' : '45c10911-200f-4e27-a666-9e9fca147395');
 
+OneDriveClient.prototype.clientId = window.location.hostname == 'app.diagrams.net' ?
+		'b5ff67d6-3155-4fca-965a-59a3655c4476' : OneDriveClient.prototype.clientId;
 /**
  * OAuth 2.0 scopes for installing Drive Apps.
  */
@@ -191,7 +193,8 @@ OneDriveClient.prototype.authenticate = function(success, error, failOnAuth)
 			
 			if (authInfo != null)
 			{
-				var req = new mxXmlRequest(this.redirectUri + '?refresh_token=' + authInfo.refresh_token, null, 'GET');
+				var req = new mxXmlRequest(this.redirectUri + '?refresh_token=' + authInfo.refresh_token +
+						'&state=' + encodeURIComponent('cId=' + this.clientId + '&domain=' + window.location.hostname), null, 'GET'); //To identify which app/domain is used
 				
 				req.send(mxUtils.bind(this, function(req)
 				{
@@ -233,7 +236,8 @@ OneDriveClient.prototype.authenticate = function(success, error, failOnAuth)
 					var url = 'https://login.microsoftonline.com/common/oauth2/v2.0/authorize' +
 						'?client_id=' + this.clientId + '&response_type=code' +
 						'&redirect_uri=' + encodeURIComponent(this.redirectUri) +
-						'&scope=' + encodeURIComponent(this.scopes);
+						'&scope=' + encodeURIComponent(this.scopes) +
+						'&state=' + encodeURIComponent('cId=' + this.clientId + '&domain=' + window.location.hostname); //To identify which app/domain is used
 	
 					var width = 525,
 						height = 525,
@@ -911,13 +915,21 @@ OneDriveClient.prototype.writeFile = function(url, data, method, contentType, su
 				try
 				{
 					var acceptResponse = true;
+					var timeoutThread = null;
 					
-					var timeoutThread = window.setTimeout(mxUtils.bind(this, function()
+					try
 					{
-						acceptResponse = false;
-						error({code: App.ERROR_TIMEOUT, retry: doExecute});
-					}), this.ui.timeout);
-		
+						timeoutThread = window.setTimeout(mxUtils.bind(this, function()
+						{
+							acceptResponse = false;
+							error({code: App.ERROR_TIMEOUT, retry: doExecute});
+						}), this.ui.timeout);
+					}
+					catch (e)
+					{
+						// Ignore window closed
+					}
+					
 					var req = new mxXmlRequest(url, data, method);
 					
 					req.setRequestHeaders = mxUtils.bind(this, function(request, params)
@@ -1194,7 +1206,8 @@ OneDriveClient.prototype.logout = function()
 			localStorage.removeItem('odpickerv7cache');	
 		}
 	}
-	
+
+	window.open('https://login.microsoftonline.com/common/oauth2/v2.0/logout', 'logout', 'width=525,height=525,status=no,resizable=yes,toolbar=no,menubar=no,scrollbars=yes');
 	this.clearPersistentToken();
 	this.setUser(null);
 	this.token = null;

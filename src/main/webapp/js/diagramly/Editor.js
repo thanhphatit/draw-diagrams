@@ -7,8 +7,23 @@
 	/**
 	 * Specifies the app name. Default is document.title.
 	 */
-	Editor.prototype.appName = 'draw.io';
+	Editor.prototype.appName = 'diagrams.net';
+		
+	/**
+	 * Known file types.
+	 */
+	Editor.prototype.diagramFileTypes = [
+		{description: 'diagramXmlDesc', extension: 'drawio'},
+		{description: 'diagramPngDesc', extension: 'png'},
+		{description: 'diagramSvgDesc', extension: 'svg'},
+		{description: 'diagramHtmlDesc', extension: 'html'},
+		{description: 'diagramXmlDesc', extension: 'xml'}];
 	
+	/**
+	 * Known file types.
+	 */
+	Editor.prototype.libraryFileTypes = [{description: 'Library (.drawiolib, .xml)', extensions: ['drawiolib', 'xml']}];
+
 	/**
 	 * Known extensions for own files.
 	 */
@@ -16,7 +31,7 @@
 		{ext: 'html', title: 'filetypeHtml'},
 		{ext: 'png', title: 'filetypePng'},
 		{ext: 'svg', title: 'filetypeSvg'}];
-	
+
 	/**
 	 * Used in the GraphViewer lightbox.
 	 */
@@ -130,7 +145,7 @@
 	/**
 	 * Disables the shadow option in the format panel.
 	 */
-	Editor.shadowOptionEnabled = true;
+	Editor.shadowOptionEnabled = !mxClient.IS_SF;
 
 	/**
 	 * Reference to the config object passed to <configure>.
@@ -214,15 +229,50 @@
         			{val: 'trapezoidPerimeter', dispName: 'Trapezoid'}, {val: 'stepPerimeter', dispName: 'Step'}]
         },
         {name: 'fixDash', dispName: 'Fixed Dash', type: 'bool', defVal: false},
-        {name: 'jiggle', dispName: 'Jiggle', type: 'float', min: 0, defVal: 1.5, isVisible: function(state)
+        {name: 'jiggle', dispName: 'Jiggle', type: 'float', min: 0, defVal: 1.5, isVisible: function(state, format)
         {
         	return mxUtils.getValue(state.style, 'comic', '0') == '1';
         }},
         {name: 'autosize', dispName: 'Autosize', type: 'bool', defVal: false},
-        {name: 'collapsible', dispName: 'Collapsible', type: 'bool', defVal: false},
-        {name: 'container', dispName: 'Container', type: 'bool', defVal: false},
-        {name: 'recursiveResize', dispName: 'Resize Children', type: 'bool', defVal: true},
-        {name: 'part', dispName: 'Part', type: 'bool', defVal: false},
+        {name: 'container', dispName: 'Container', type: 'bool', defVal: false, isVisible: function(state, format)
+        {
+    		return state.vertices.length == 1 && state.edges.length == 0;
+        }},
+        {name: 'dropTarget', dispName: 'Drop Target', type: 'bool', getDefaultValue: function(state, format)
+        {
+        	var cell = (state.vertices.length == 1 && state.edges.length == 0) ? state.vertices[0] : null;
+        	var graph = format.editorUi.editor.graph;
+        	
+        	return cell != null && (graph.isSwimlane(cell) || graph.model.getChildCount(cell) > 0);
+        }, isVisible: function(state, format)
+        {
+    		return state.vertices.length == 1 && state.edges.length == 0 &&
+    			mxUtils.getValue(state.style, 'part', '0') != '1';
+        }},
+        {name: 'collapsible', dispName: 'Collapsible', type: 'bool', getDefaultValue: function(state, format)
+        {
+        	var cell = (state.vertices.length == 1 && state.edges.length == 0) ? state.vertices[0] : null;
+        	var graph = format.editorUi.editor.graph;
+        	
+        	return cell != null && ((graph.isContainer(cell) && state.style['collapsible'] != '0') ||
+        		(!graph.isContainer(cell) && state.style['collapsible'] == '1'));
+        }, isVisible: function(state, format)
+        {
+    		return state.vertices.length == 1 && state.edges.length == 0;
+        }},
+        {name: 'recursiveResize', dispName: 'Resize Children', type: 'bool', defVal: true, isVisible: function(state, format)
+        {
+    		return state.vertices.length == 1 && state.edges.length == 0 &&
+    			!format.editorUi.editor.graph.isSwimlane(state.vertices[0]) &&
+    			mxUtils.getValue(state.style, 'childLayout', null) == null;
+        }},
+        {name: 'expand', dispName: 'Expand', type: 'bool', defVal: true},
+        {name: 'part', dispName: 'Part', type: 'bool', defVal: false, isVisible: function(state, format)
+        {
+        	var model = format.editorUi.editor.graph.model;
+        	
+        	return (state.vertices.length > 0) ? model.isVertex(model.getParent(state.vertices[0])) : false;
+        }},
         {name: 'editable', dispName: 'Editable', type: 'bool', defVal: true},
         {name: 'backgroundOutline', dispName: 'Background Outline', type: 'bool', defVal: false},
         {name: 'movable', dispName: 'Movable', type: 'bool', defVal: true},
@@ -240,6 +290,12 @@
         {name: 'deletable', dispName: 'Deletable', type: 'bool', defVal: true},
         {name: 'treeFolding', dispName: 'Tree Folding', type: 'bool', defVal: false},
         {name: 'treeMoving', dispName: 'Tree Moving', type: 'bool', defVal: false},
+        {name: 'pointerEvents', dispName: 'Pointer Events', type: 'bool', defVal: true, isVisible: function(state, format)
+        {
+        	var fillColor = mxUtils.getValue(state.style, mxConstants.STYLE_FILLCOLOR, null);
+        	
+        	return fillColor == null || fillColor == mxConstants.NONE;
+        }},
         {name: 'moveCells', dispName: 'Move Cells on Fold', type: 'bool', defVal: false, isVisible: function(state, format)
         {
         	return state.vertices.length > 0 && format.editorUi.editor.graph.isContainer(state.vertices[0]);
@@ -306,6 +362,8 @@
 		'#\n' +
 		'## Connections between rows ("from": source colum, "to": target column).\n' +
 		'## Label, style and invert are optional. Defaults are \'\', current style and false.\n' +
+		'## If placeholders are used in the style, they are replaced with data from the source.\n' +
+		'## An optional placeholders can be set to target to use data from the target instead.\n' +
 		'## In addition to label, an optional fromlabel and tolabel can be used to name the column\n' +
 		'## that contains the text for the label in the edges source or target (invert ignored).\n' +
 		'## The label is concatenated in the form fromlabel + label + tolabel if all are defined.\n' +
@@ -407,7 +465,7 @@
 	/**
 	 * Helper function to extract the graph model XML node.
 	 */
-	Editor.extractGraphModel = function(node, allowMxFile)
+	Editor.extractGraphModel = function(node, allowMxFile, checked)
 	{
 		if (node != null && typeof(pako) !== 'undefined')
 		{
@@ -447,7 +505,7 @@
 					if (divs2.length > 0)
 					{
 						var data = mxUtils.getTextContent(divs2[0]);
-		        		data = Graph.decompress(data);
+		        		data = Graph.decompress(data, null, checked);
 		        		
 		        		if (data.length > 0)
 		        		{
@@ -503,7 +561,7 @@
 			
 			if (diagramNode != null)
 			{
-				node = Editor.parseDiagramNode(diagramNode);
+				node = Editor.parseDiagramNode(diagramNode, checked);
 			}
 		}
 		
@@ -518,14 +576,14 @@
 	/**
 	 * Extracts the XML from the compressed or non-compressed text chunk.
 	 */
-	Editor.parseDiagramNode = function(diagramNode)
+	Editor.parseDiagramNode = function(diagramNode, checked)
 	{
 		var text = mxUtils.trim(mxUtils.getTextContent(diagramNode));
 		var node = null;
 		
 		if (text.length > 0)
 		{
-			var tmp = Graph.decompress(text);
+			var tmp = Graph.decompress(text, null, checked);
 			
 			if (tmp != null && tmp.length > 0)
 			{
@@ -577,7 +635,7 @@
 
 		// Workaround for invalid character error in Safari
 		var f = (window.atob && !mxClient.IS_SF) ? atob(base64) : Base64.decode(base64, true);
-		var check = '\n/Subject (';
+		var check = '/Subject (%3Cmxfile';
 		var result = null;
 		var curline = '';
 		var checked = 0;
@@ -607,7 +665,8 @@
 			
 			if (checked == check.length)
 			{
-				var end = f.indexOf(')\n', pos);
+				var end = f.indexOf('%3C%2Fmxfile%3E)', pos) + 15; //15 is the length of encoded </mxfile>
+				pos -= 9; //9 is the length of encoded <mxfile
 				
 				// Default case is XML inlined in Subject metadata
 				if (end > pos)
@@ -790,7 +849,7 @@
 			}
 		}
 		
-		return cause;
+		return (cause != null) ? mxUtils.trim(cause) : cause;
 	};
 
 	/**
@@ -1237,7 +1296,7 @@
 	/**
 	 * Helper function to extract the graph model XML node.
 	 */
-	Editor.prototype.extractGraphModel = function(node, allowMxFile)
+	Editor.prototype.extractGraphModel = function(node, allowMxFile, checked)
 	{
 		return Editor.extractGraphModel.apply(this, arguments);
 	};
@@ -1423,12 +1482,14 @@
 			this.corsRegExp = new RegExp(decodeURIComponent(urlParams['cors']));
 		}
 		
+		// No access-control-allow-origin for some Iconfinder images, add this when fixed:
+		// /^https?:\/\/[^\/]*\.iconfinder.com\//.test(url) ||
 		return (this.corsRegExp != null && this.corsRegExp.test(url)) ||
 			url.substring(0, 34) === 'https://raw.githubusercontent.com/' ||
 			url.substring(0, 23) === 'https://cdn.rawgit.com/' ||
 			url.substring(0, 19) === 'https://rawgit.com/' ||
 			/^https?:\/\/[^\/]*\.blob.core.windows.net\//.test(url) ||
-			/^https?:\/\/[^\/]*\.iconfinder.com\//.test(url) ||
+			/^https?:\/\/[^\/]*\.diagrams\.new\/proxy/.test(url) ||
 			/^https?:\/\/[^\/]*\.draw\.io\/proxy/.test(url) ||
 			/^https?:\/\/[^\/]*\.github\.io\//.test(url);
 	};
@@ -3509,7 +3570,8 @@
 					if (!prop.isVisible(state, this)) continue;
 				}
 				
-				var pValue = state.style[key] != null? mxUtils.htmlEntities(state.style[key] + '') : prop.defVal; //or undefined if defVal is undefined
+				var pValue = state.style[key] != null? mxUtils.htmlEntities(state.style[key] + '') :
+					((prop.getDefaultValue != null) ? prop.getDefaultValue(state, this) : prop.defVal); //or undefined if defVal is undefined
 
 				if (prop.type == 'separator')
 				{
@@ -4056,6 +4118,17 @@
 		}
 		
 		this.updateGlobalUrlVariables();
+	};
+
+	/**
+	 * Disables fast zoom with shadow in lightbox for Safari
+	 * to work around blank output on retina screen.
+	 */
+	var graphIsFastZoomEnabled = Graph.prototype.isFastZoomEnabled;
+	
+	Graph.prototype.isFastZoomEnabled = function()
+	{
+		return graphIsFastZoomEnabled.apply(this, arguments) && (!this.shadowVisible || !mxClient.IS_SF);
 	};
 	
 	/**
@@ -4861,7 +4934,7 @@
 	 */
 	Graph.prototype.setShadowVisible = function(value, fireEvent)
 	{
-		if (mxClient.IS_SVG)
+		if (mxClient.IS_SVG && !mxClient.IS_SF)
 		{
 			fireEvent = (fireEvent != null) ? fireEvent : true;
 			this.shadowVisible = value;
@@ -4949,9 +5022,10 @@
 	mxStencilRegistry.libraries['mockup/navigation'] = [SHAPES_PATH + '/mockup/mxMockupNavigation.js', STENCIL_PATH + '/mockup/misc.xml'];
 	mxStencilRegistry.libraries['mockup/text'] = [SHAPES_PATH + '/mockup/mxMockupText.js'];
 	mxStencilRegistry.libraries['floorplan'] = [SHAPES_PATH + '/mxFloorplan.js', STENCIL_PATH + '/floorplan.xml'];
-	mxStencilRegistry.libraries['bootstrap'] = [SHAPES_PATH + '/mxBootstrap.js', STENCIL_PATH + '/bootstrap.xml'];
+	mxStencilRegistry.libraries['bootstrap'] = [SHAPES_PATH + '/mxBootstrap.js', SHAPES_PATH + '/mxBasic.js', STENCIL_PATH + '/bootstrap.xml'];
 	mxStencilRegistry.libraries['gmdl'] = [SHAPES_PATH + '/mxGmdl.js', STENCIL_PATH + '/gmdl.xml'];
 	mxStencilRegistry.libraries['gcp2'] = [SHAPES_PATH + '/mxGCP2.js', STENCIL_PATH + '/gcp2.xml'];
+	mxStencilRegistry.libraries['ibm'] = [SHAPES_PATH + '/mxIBM.js', STENCIL_PATH + '/ibm.xml'];
 	mxStencilRegistry.libraries['cabinets'] = [SHAPES_PATH + '/mxCabinets.js', STENCIL_PATH + '/cabinets.xml'];
 	mxStencilRegistry.libraries['archimate'] = [SHAPES_PATH + '/mxArchiMate.js'];
 	mxStencilRegistry.libraries['archimate3'] = [SHAPES_PATH + '/mxArchiMate3.js'];
