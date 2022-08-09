@@ -205,10 +205,10 @@ mxVsdxCanvas2D.prototype.createRowRel = function(type, index, x, y, a, b, c , d,
 	row.appendChild(this.createCellElem("X", x, xF));
 	row.appendChild(this.createCellElem("Y", y, yF));
 	
-	if (a != null) row.appendChild(this.createCellElem("A", a, aF));
-	if (b != null) row.appendChild(this.createCellElem("B", b, bF));
-	if (c != null) row.appendChild(this.createCellElem("C", c, cF));
-	if (d != null) row.appendChild(this.createCellElem("D", d, dF));
+	if (a != null && isFinite(a)) row.appendChild(this.createCellElem("A", a, aF));
+	if (b != null && isFinite(b)) row.appendChild(this.createCellElem("B", b, bF));
+	if (c != null && isFinite(c)) row.appendChild(this.createCellElem("C", c, cF));
+	if (d != null && isFinite(d)) row.appendChild(this.createCellElem("D", d, dF));
 	
 	return row;
 };
@@ -699,8 +699,7 @@ mxVsdxCanvas2D.prototype.image = function(x, y, w, h, src, aspect, flipH, flipV)
  * Function: text
  * 
  * Paints the given text. Possible values for format are empty string for
- * plain text and html for HTML markup. Background and border color as well
- * as clipping is not available in plain text labels for VML. HTML labels
+ * plain text and html for HTML markup. HTML labels
  * are not available as part of shapes with no foreignObject support in SVG
  * (eg. IE9, IE10).
  * 
@@ -734,8 +733,8 @@ mxVsdxCanvas2D.prototype.text = function(x, y, w, h, str, align, valign, wrap, f
 		if (w == 0 && h == 0)
 		{
 			var strSize = mxUtils.getSizeForString(str, that.cellState.style["fontSize"], that.cellState.style["fontFamily"]);
-			w = strSize.width * 1.2;
-			h = strSize.height * 1.2;
+			w = strSize.width * 2;
+			h = strSize.height * 2;
 		}
 		
 		//TODO support HTML text formatting and remaining attributes
@@ -752,7 +751,7 @@ mxVsdxCanvas2D.prototype.text = function(x, y, w, h, str, align, valign, wrap, f
 			if (this.html2txtDiv == null)
 				this.html2txtDiv = document.createElement('div');
 			
-			this.html2txtDiv.innerHTML = str;
+			this.html2txtDiv.innerHTML = Graph.sanitizeHtml(str);
 			str = mxUtils.extractTextWithWhitespace(this.html2txtDiv.childNodes);
     	}
 		
@@ -770,14 +769,6 @@ mxVsdxCanvas2D.prototype.text = function(x, y, w, h, str, align, valign, wrap, f
 
 		var text = this.createElt("Text");
 
-		var rgb2hex = function (rgb){
-			rgb = rgb.match(/^rgba?[\s+]?\([\s+]?(\d+)[\s+]?,[\s+]?(\d+)[\s+]?,[\s+]?(\d+)[\s+]?/i);
-			return (rgb && rgb.length === 4) ? "#" +
-			  ("0" + parseInt(rgb[1],10).toString(16)).slice(-2) +
-			  ("0" + parseInt(rgb[2],10).toString(16)).slice(-2) +
-			  ("0" + parseInt(rgb[3],10).toString(16)).slice(-2) : '';
-		};
-		
 		var rowIndex = 0, pIndex = 0;
 		var calcW = 0, calcH = 0, lastW = 0, lastH = 0, lineH = 0;
 		
@@ -817,7 +808,7 @@ mxVsdxCanvas2D.prototype.text = function(x, y, w, h, str, align, valign, wrap, f
 			charRow.setAttribute('IX', rowIndex);
 			
 			
-			if (styleMap['fontColor'])	charRow.appendChild(that.createCellElem("Color", styleMap['fontColor']));
+			if (styleMap['fontColor'])	charRow.appendChild(that.createCellElem("Color", mxUtils.rgba2hex(styleMap['fontColor'])));
 			
 			if (fontSize)	charRow.appendChild(that.createCellElemScaled("Size", fontSize * 0.97)); //the magic number 0.97 is needed such that text do not overflow
 			
@@ -913,7 +904,7 @@ mxVsdxCanvas2D.prototype.text = function(x, y, w, h, str, align, valign, wrap, f
 						italic: style.getPropertyValue('font-style') == 'italic' || pStyle['italic'],
 						underline: style.getPropertyValue('text-decoration').indexOf('underline') >= 0 || pStyle['underline'],
 						align: style.getPropertyValue('text-align'),
-						fontColor: rgb2hex(style.getPropertyValue('color')),
+						fontColor: style.getPropertyValue('color'),
 						fontSize: parseFloat(style.getPropertyValue('font-size')),
 						fontFamily: style.getPropertyValue('font-family').replace(/"/g, ''), //remove quotes
 						blockElem: style.getPropertyValue('display') == 'block' || nodeName == "BR" || nodeName == "LI",

@@ -15,7 +15,7 @@ var mxSettings =
 	defaultFormatWidth: (screen.width < 600) ? '0' : '240',
 	
 	// NOTE: Hardcoded in index.html due to timing of JS loading
-	key: '.drawio-config',
+	key: Editor.settingsKey,
 
 	getLanguage: function()
 	{
@@ -25,13 +25,57 @@ var mxSettings =
 	{
 		mxSettings.settings.language = lang;
 	},
+	isMainSettings: function()
+	{
+		return mxSettings.key == '.drawio-config';
+	},
+	getMainSettings: function()
+	{
+		var value = localStorage.getItem('.drawio-config');
+
+		if (value == null)
+		{
+			value = mxSettings.getDefaults();
+			delete value.isNew;
+		}
+		else
+		{
+			value = JSON.parse(value);
+			value.version = mxSettings.currentVersion;
+		}
+
+		return value;
+	},
 	getUi: function()
 	{
-		return mxSettings.settings.ui;
+		return (mxSettings.isMainSettings()) ? mxSettings.settings.ui :
+			mxSettings.getMainSettings().ui;
 	},
 	setUi: function(ui)
 	{
-		mxSettings.settings.ui = ui;
+		if (mxSettings.isMainSettings())
+		{
+			mxSettings.settings.ui = ui;
+
+			if (ui == 'kennedy' || ui == '')
+			{
+				mxSettings.settings.darkMode = false;
+			}
+
+			mxSettings.save();
+		}
+		else
+		{
+			var value = mxSettings.getMainSettings();
+			value.ui = ui;
+
+			if (ui == 'kennedy')
+			{
+				value.darkMode = false;
+			}
+
+			localStorage.setItem('.drawio-config', JSON.stringify(value));
+		}
 	},
 	getShowStartScreen: function()
 	{
@@ -111,6 +155,12 @@ var mxSettings =
 	{
 		// Makes sure to update the latest data from the localStorage
 		mxSettings.load();
+		
+		//If the setting is incorrect, reset it to an empty array
+		if (!Array.isArray(mxSettings.settings.customLibraries))
+		{
+			mxSettings.settings.customLibraries = [];
+		}
 		
 		if (mxUtils.indexOf(mxSettings.settings.customLibraries, id) < 0)
 		{
@@ -194,10 +244,17 @@ var mxSettings =
 	{
 		mxSettings.settings.isRulerOn = value;
 	},
-	init: function()
+	getDraftSaveDelay: function()
 	{
-		mxSettings.settings = 
-		{
+		return mxSettings.settings.draftSaveDelay;
+	},
+	setDraftSaveDelay: function(value)
+	{
+		mxSettings.settings.draftSaveDelay = value;
+	},
+	getDefaults: function()
+	{
+		return {
 			language: '',
 			configVersion: Editor.configVersion,
 			customFonts: [],
@@ -206,13 +263,13 @@ var mxSettings =
 			plugins: [],
 			recentColors: [],
 			formatWidth: mxSettings.defaultFormatWidth,
-			createTarget: false,
+			createTarget: urlParams['sketch'] == '1',
 			pageFormat: mxGraph.prototype.pageFormat,
 			search: true,
 			showStartScreen: true,
 			gridColor: mxGraphView.prototype.defaultGridColor,
 			darkGridColor: mxGraphView.prototype.defaultDarkGridColor,
-			autosave: true,
+			autosave: !EditorUi.isElectronApp,
 			resizeImages: null,
 			openCounter: 0,
 			version: mxSettings.currentVersion,
@@ -221,6 +278,10 @@ var mxSettings =
 			unit: mxConstants.POINTS,
 			isRulerOn: false
 		};
+	},
+	init: function()
+	{
+		mxSettings.settings = mxSettings.getDefaults();
 	},
 	save: function()
 	{
@@ -336,7 +397,13 @@ var mxSettings =
 			
 			if (mxSettings.settings.autosave == null)
 			{
-				mxSettings.settings.autosave = true;
+				mxSettings.settings.autosave = !EditorUi.isElectronApp;
+			}
+			else if (EditorUi.isElectronApp && localStorage.getItem('._autoSaveTrans_') == null) //Transition to no autosave
+			{
+				localStorage.setItem('._autoSaveTrans_', '1');
+				mxSettings.settings.autosave = false;
+				mxSettings.save();
 			}
 			
 			if (mxSettings.settings.scratchpadSeen != null)

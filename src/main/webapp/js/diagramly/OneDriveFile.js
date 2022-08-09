@@ -13,6 +13,79 @@ OneDriveFile = function(ui, data, meta)
 mxUtils.extend(OneDriveFile, DrawioFile);
 
 /**
+ * Shorter autosave delay for optimistic sync.
+ */
+OneDriveFile.prototype.autosaveDelay = 500;
+
+/**
+ * Hook for subclassers.
+ */
+OneDriveFile.prototype.isRealtimeSupported = function()
+{
+	return true;
+};
+
+/**
+ * Translates this point by the given vector.
+ * 
+ * @param {number} dx X-coordinate of the translation.
+ * @param {number} dy Y-coordinate of the translation.
+ */
+OneDriveFile.prototype.share = function()
+{
+	var url = this.meta.webUrl;
+	url = url.substring(0, url.lastIndexOf('/'));
+	
+	if (this.meta.parentReference != null)
+	{
+		try
+		{
+			// Best effort guessing of the web interface URL for the file
+			if (this.meta.parentReference.driveType == 'personal')
+			{
+				url = 'https://onedrive.live.com/?cid=' + encodeURIComponent(this.meta.parentReference.driveId) +
+					'&id=' + encodeURIComponent(this.meta.id);
+			}
+			else if (this.meta.parentReference.driveType == 'documentLibrary')
+			{
+				var path = this.meta.parentReference.path;
+				path = path.substring(path.indexOf('/root:') + 6);
+				
+				var id = this.meta.webUrl;
+				var url = id.substring(0, id.length - path.length - this.meta.name.length - ((path.length > 0) ? 1 : 0)); 
+				id = id.substring(id.indexOf('/', 8));
+				
+				url = url + '/Forms/AllItems.aspx?id=' + id + '&parent=' + id.substring(0, id.lastIndexOf('/'));
+			}
+			else if (this.meta.parentReference.driveType == 'business')
+			{
+				var url = this.meta['@microsoft.graph.downloadUrl'];
+				var idx = url.indexOf('/_layouts/15/download.aspx?');
+			
+				// Strips protocol
+				var id = this.meta.webUrl;
+				var parent = id;
+				
+				id = id.substring(8);
+			
+				// Gets path and parent path
+				id = id.substring(id.indexOf('/'));
+				parent = parent.substring(0, parent.lastIndexOf('/'));
+				parent = parent.substring(parent.indexOf('/', 8))
+				
+				url = url.substring(0, idx) + '/_layouts/15/onedrive.aspx?id=' + id + '&parent=' + parent;
+			}
+		}
+		catch (e)
+		{
+			// ignore
+		}
+	}
+	
+	this.ui.editor.graph.openLink(url);
+};
+
+/**
  * Translates this point by the given vector.
  * 
  * @param {number} dx X-coordinate of the translation.
@@ -44,7 +117,7 @@ OneDriveFile.prototype.getIdOf = function(itemObj, parent)
 {
 	//TODO driveId is most probably always there. No need to check if it exists. Also, after some time, the code that check the old id format won't be needed 
 	return ((itemObj.parentReference != null && itemObj.parentReference.driveId != null) ? itemObj.parentReference.driveId + '/' : '') +
-		((parent != null) ? itemObj.parentReference.id : itemObj.id);
+		((parent != null) ? itemObj.parentReference.id : (itemObj.id + (itemObj.folder && itemObj.folder.isRoot? '/root' : '')));
 };
 
 /**
@@ -103,6 +176,23 @@ OneDriveFile.prototype.getTitle = function()
  * @param {number} dy Y-coordinate of the translation.
  */
 OneDriveFile.prototype.isRenamable = function()
+{
+	return true;
+};
+
+/**
+ * Returns true if the notification to update should be sent
+ * together with the save request.
+ */
+OneDriveFile.prototype.isOptimisticSync = function()
+{
+	return true;
+};
+
+/**
+ * Enabling fast syncin OneDrive production.
+ */
+OneDriveFile.prototype.isSyncEnabled = function()
 {
 	return true;
 };
@@ -179,20 +269,6 @@ OneDriveFile.prototype.getDescriptor = function()
 OneDriveFile.prototype.setDescriptor = function(desc)
 {
 	this.meta = desc;
-};
-
-/**
- * Using the quickXorHash of the content as the access password.
- */
-OneDriveFile.prototype.getDescriptorSecret = function(desc)
-{
-	if (desc.file != null && desc.file.hashes != null &&
-		desc.file.hashes.quickXorHash != null)
-	{
-		return desc.file.hashes.quickXorHash;
-	}
-	
-	return null;
 };
 
 /**
@@ -317,36 +393,27 @@ OneDriveFile.prototype.saveFile = function(title, revision, success, error, unlo
 		{
 			var doSave = mxUtils.bind(this, function()
 			{
-				var prevModified = null;
-				var modified = null;
-				
 				try
 				{
-					// Makes sure no changes get lost while the file is saved
-					prevModified = this.isModified;
-					modified = this.isModified();
-					this.savingFile = true;
+					// Sets shadow modified state during save
 					this.savingFileTime = new Date();
+					this.setShadowModified(false);
+					this.savingFile = true;
 					
-					var prepare = mxUtils.bind(this, function()
-					{
-						this.setModified(false);
-						
-						this.isModified = function()
-						{
-							return modified;
-						};
-					});
-						
 					var etag = (!overwrite && this.constructor == OneDriveFile &&
-							(DrawioFile.SYNC == 'manual' || DrawioFile.SYNC == 'auto')) ?
-							this.getCurrentEtag() : null;
+						(DrawioFile.SYNC == 'manual' || DrawioFile.SYNC == 'auto')) ?
+						this.getCurrentEtag() : null;
 					var lastDesc = this.meta;
-					prepare();
-					
+
+					if (this.sync != null)
+					{
+						this.sync.fileSaving();
+					}
+
 					this.ui.oneDrive.saveFile(this, mxUtils.bind(this, function(meta, savedData)
 					{
-						this.isModified = prevModified;
+						// Checks for changes during save
+						this.setModified(this.getShadowModified());
 						this.savingFile = false;
 						this.meta = meta;
 	
@@ -359,76 +426,66 @@ OneDriveFile.prototype.saveFile = function(title, revision, success, error, unlo
 								success();
 							}
 						}), error);
-					}),
-					mxUtils.bind(this, function(err, req)
+					}), mxUtils.bind(this, function(err, req)
 					{
-						this.savingFile = false;
-						this.isModified = prevModified;
-						this.setModified(modified || this.isModified());
-						
-						if (this.isConflict(req))
-				    	{
-							this.inConflictState = true;
-	
-							if (this.sync != null)
-							{
-								this.savingFile = true;
-								this.savingFileTime = new Date();
-								
-								this.sync.fileConflict(null, mxUtils.bind(this, function()
-								{
-									// Adds random cool-off
-									window.setTimeout(mxUtils.bind(this, function()
-									{
-										this.updateFileData();
-										doSave();
-									}), 100 + Math.random() * 500);
-								}), mxUtils.bind(this, function()
-								{
-									this.savingFile = false;
+						try
+						{
+							this.savingFile = false;
+							
+							if (this.isConflict(req))
+					    	{
+								this.inConflictState = true;
+		
+								if (this.sync != null)
+								{	
+									this.savingFile = true;
 									
-									if (error != null)
+									this.sync.fileConflict(null, mxUtils.bind(this, function()
 									{
-										error();
-									}
-								}));
+										// Adds random cool-off
+										window.setTimeout(mxUtils.bind(this, function()
+										{
+											this.updateFileData();
+											doSave();
+										}), 100 + Math.random() * 500);
+									}), mxUtils.bind(this, function()
+									{
+										this.savingFile = false;
+							
+										if (error != null)
+										{
+											error();
+										}
+									}));
+								}
+								else if (error != null)
+								{
+									error();
+								}
 							}
 							else if (error != null)
 							{
-								error();
+								error(err);
 							}
 						}
-						else if (error != null)
+						catch (e)
 						{
-							// Handles modified state for retries
-							if (err != null && err.retry != null)
+							this.savingFile = false;
+				
+							if (error != null)
 							{
-								var retry = err.retry;
-								
-								err.retry = function()
-								{
-									prepare();
-									retry();
-								};
+								error(e);
 							}
-							
-							error(err);
+							else
+							{
+								throw e;
+							}
 						}
 					}), etag);
 				}
 				catch (e)
 				{
 					this.savingFile = false;
-					
-					if (prevModified != null)
-					{
-						this.isModified = prevModified;
-					}
-					
-					if (modified != null)
-					{
-						this.setModified(modified || this.isModified());
-					}
 					
 					if (error != null)
 					{
@@ -445,11 +502,15 @@ OneDriveFile.prototype.saveFile = function(title, revision, success, error, unlo
 		}
 		else
 		{
-			this.savingFile = true;
+			// Sets shadow modified state during save
 			this.savingFileTime = new Date();
+			this.setShadowModified(false);
+			this.savingFile = true;
 		
 			this.ui.oneDrive.insertFile(title, this.getData(), mxUtils.bind(this, function(file)
 			{
+				// Checks for changes during save
+				this.setModified(this.getShadowModified());
 				this.savingFile = false;
 				
 				if (success != null)
@@ -479,7 +540,7 @@ OneDriveFile.prototype.saveFile = function(title, revision, success, error, unlo
  */
 OneDriveFile.prototype.rename = function(title, success, error)
 {
-	var etag = this.getCurrentEtag();
+	var rev = this.getCurrentRevisionId();
 	
 	this.ui.oneDrive.renameFile(this, title, mxUtils.bind(this, function(meta)
 	{
@@ -489,7 +550,7 @@ OneDriveFile.prototype.rename = function(title, success, error)
 			
 			if (this.sync != null)
 			{
-				this.sync.descriptorChanged(etag);
+				this.sync.descriptorChanged(rev);
 			}
 			
 			this.save(true, success, error);
@@ -501,7 +562,7 @@ OneDriveFile.prototype.rename = function(title, success, error)
 
 			if (this.sync != null)
 			{
-				this.sync.descriptorChanged(etag);
+				this.sync.descriptorChanged(rev);
 			}
 			
 			if (success != null)

@@ -12,7 +12,7 @@ TrelloClient = function(editorUi)
 mxUtils.extend(TrelloClient, DrawioClient);
 
 TrelloClient.prototype.key = (window.location.hostname == 'test.draw.io') ?
-	'e73615c79cf7e381aef91c85936e9553' : 'e73615c79cf7e381aef91c85936e9553';
+	'e89d109082298ce91f6576f82f458551' : 'e89d109082298ce91f6576f82f458551';
 
 TrelloClient.prototype.baseUrl = 'https://api.trello.com/1/';
 
@@ -116,9 +116,12 @@ TrelloClient.prototype.getFile = function(id, success, error, denyConvert, asLib
 		{ 
 			window.clearTimeout(timeoutThread);
 	    	
-		    	if (acceptResponse)
-		    	{
+		    if (acceptResponse)
+		    {
 				var binary = /\.png$/i.test(meta.name);
+				var headers = {
+					Authorization: 'OAuth oauth_consumer_key="' + Trello.key() + '", oauth_token="' + Trello.token() + '"'
+				};
 				
 				// TODO Trello doesn't allow CORS requests to load attachments. Confirm that
 				// and make sure that only a proxy technique can work!
@@ -127,7 +130,7 @@ TrelloClient.prototype.getFile = function(id, success, error, denyConvert, asLib
 					(!this.ui.useCanvasForExport && binary))
 				{
 					this.ui.convertFile(PROXY_URL + '?url=' + encodeURIComponent(meta.url), meta.name, meta.mimeType,
-						this.extension, success, error);
+						this.extension, success, error, null, headers);
 				}
 				else
 				{
@@ -139,20 +142,20 @@ TrelloClient.prototype.getFile = function(id, success, error, denyConvert, asLib
 						error({code: App.ERROR_TIMEOUT})
 					}), this.ui.timeout);
 					
-					this.ui.loadUrl(PROXY_URL + '?url=' + encodeURIComponent(meta.url), mxUtils.bind(this, function(data)
+					this.ui.editor.loadUrl(PROXY_URL + '?url=' + encodeURIComponent(meta.url), mxUtils.bind(this, function(data)
 					{
 						window.clearTimeout(timeoutThread);
 				    	
-					    	if (acceptResponse)
-					    	{
-					    		//keep our id which includes the cardId
-					    		meta.compoundId = id;
+					    if (acceptResponse)
+					   	{
+					    	//keep our id which includes the cardId
+					    	meta.compoundId = id;
 					    		
 							var index = (binary) ? data.lastIndexOf(',') : -1;
 	
 							if (index > 0)
 							{
-								var xml = this.ui.extractGraphModelFromPng(data.substring(index + 1));
+								var xml = this.ui.extractGraphModelFromPng(data);
 								
 								if (xml != null && xml.length > 0)
 								{
@@ -172,8 +175,8 @@ TrelloClient.prototype.getFile = function(id, success, error, denyConvert, asLib
 							{
 								success(new TrelloFile(this.ui, data, meta));
 							}
-					    	}
-			    		}), mxUtils.bind(this, function(err, req)
+					    }
+			    	}), mxUtils.bind(this, function(err, req)
 					{
 						window.clearTimeout(timeoutThread);
 					    	
@@ -189,9 +192,9 @@ TrelloClient.prototype.getFile = function(id, success, error, denyConvert, asLib
 				    		}
 				    	}
 					}), binary || (meta.mimeType != null &&
-						meta.mimeType.substring(0, 6) == 'image/'));
+						meta.mimeType.substring(0, 6) == 'image/'), null, null, null, headers);
 				}
-		    	}
+		    }
 		}), mxUtils.bind(this, function(err)
 		{
 			window.clearTimeout(timeoutThread);
@@ -452,7 +455,7 @@ TrelloClient.prototype.showTrelloDialog = function(showFiles, fn)
 	content.appendChild(div);
 
 	var dlg = new CustomDialog(this.ui, content);
-	this.ui.showDialog(dlg.container, 340, 270, true, true);
+	this.ui.showDialog(dlg.container, 340, 290, true, true);
 	
 	dlg.okButton.parentNode.removeChild(dlg.okButton);
 	
@@ -460,9 +463,12 @@ TrelloClient.prototype.showTrelloDialog = function(showFiles, fn)
 	{
 		linkCounter++;
 		var div = document.createElement('div');
-		div.style = "width:100%;text-overflow:ellipsis;overflow:hidden;vertical-align:middle;background:" + (linkCounter % 2 == 0? "#eee" : "#fff");
+		div.style = 'width:100%;text-overflow:ellipsis;overflow:hidden;vertical-align:middle;' +
+			'padding:2px 0 2px 0;background:' + (linkCounter % 2 == 0?
+			((Editor.isDarkMode()) ? '#000' : '#eee') :
+			((Editor.isDarkMode()) ? '' : '#fff'));
 		var link = document.createElement('a');
-		link.setAttribute('href', 'javascript:void(0);');
+		link.style.cursor = 'pointer';
 		
 		if (preview != null)
 		{
@@ -494,7 +500,7 @@ TrelloClient.prototype.showTrelloDialog = function(showFiles, fn)
 	var selectAtt = mxUtils.bind(this, function()
 	{
 		linkCounter = 0;
-		div.innerHTML = '';
+		div.innerText = '';
 		this.ui.spinner.spin(div, mxResources.get('loading'));
 		
 		var callback = mxUtils.bind(this, function()
@@ -559,7 +565,7 @@ TrelloClient.prototype.showTrelloDialog = function(showFiles, fn)
 		if (page == null)
 		{
 			linkCounter = 0;
-			div.innerHTML = '';
+			div.innerText = '';
 			page = 1;
 		}
 		
@@ -572,7 +578,7 @@ TrelloClient.prototype.showTrelloDialog = function(showFiles, fn)
 		
 		nextPageDiv = document.createElement('a');
 		nextPageDiv.style.display = 'block';
-		nextPageDiv.setAttribute('href', 'javascript:void(0);');
+		nextPageDiv.style.cursor = 'pointer';
 		mxUtils.write(nextPageDiv, mxResources.get('more') + '...');
 		
 		var nextPage = mxUtils.bind(this, function()
