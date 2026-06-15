@@ -1,0 +1,14 @@
+<mxlibrary>[
+  {
+    "data": "https://cdn-icons-png.flaticon.com/512/16942/16942646.png",
+    "w": 512,
+    "h": 512,
+    "title": "CI/CD"
+  },
+  {
+    "data": "https://cdn.jsdelivr.net/gh/homarr-labs/dashboard-icons/svg/kubernetes-dashboard.svg",
+    "w": 520,
+    "h": 505,
+    "title": "Kubernetes"
+  }
+]</mxlibrary>
