@@ -10,5 +10,11 @@
     "w": 520,
     "h": 505,
     "title": "Kubernetes"
+  },
+  {
+    "data": "https://cdn.jsdelivr.net/gh/homarr-labs/dashboard-icons/webp/cloudflare.webp",
+    "w": 520,
+    "h": 235,
+    "title": "Cloudflare"
   }
 ]</mxlibrary>
