@@ -12,6 +12,6 @@ window.DRAWIO_LIGHTBOX_URL = null; // Replace with your lightbox URL, eg. https:
 window.DRAW_MATH_URL = 'math/es5';
 window.DRAWIO_CONFIG = null; // Replace with your custom draw.io configurations. For more details, https://www.drawio.com/doc/faq/configure-diagram-editor
 window.DRAWIO_CONFIG = {
-  defaultCustomLibraries: ['Uhttps://tools.itblognote.com/draw-diagrams/js/personal/Personal.xml']
+  defaultCustomLibraries: ['Upersonal/Personal.xml']
 };
 urlParams['sync'] = 'manual';
