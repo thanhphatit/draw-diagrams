@@ -15,7 +15,4 @@ var basePath = window.location.href.split('?')[0].replace(/index\.html$/, '').re
 window.DRAWIO_CONFIG = {
   defaultCustomLibraries: ['U' + basePath + '/js/personal/Personal.xml']
 };
-// window.DRAWIO_CONFIG = {
-//   defaultCustomLibraries: ['Uhttps://tools.itblognote.com/draw-diagrams/js/personal/Personal.xml']
-// };
 urlParams['sync'] = 'manual';

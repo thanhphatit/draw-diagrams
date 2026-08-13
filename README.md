@@ -2,7 +2,6 @@ js/personal/Personal.xml
 PreConfig.js
 
 
-
 /**
  * Copyright (c) 2006-2024, JGraph Ltd
  * Copyright (c) 2006-2024, draw.io AG
@@ -16,7 +15,9 @@ window.DRAWIO_VIEWER_URL = null; // Replace your path to the viewer js, e.g. htt
 window.DRAWIO_LIGHTBOX_URL = null; // Replace with your lightbox URL, eg. https://www.example.com
 window.DRAW_MATH_URL = 'math/es5';
 window.DRAWIO_CONFIG = null; // Replace with your custom draw.io configurations. For more details, https://www.drawio.com/doc/faq/configure-diagram-editor
+var basePath = window.location.href.split('?')[0].replace(/index\.html$/, '').replace(/\/$/, '');
 window.DRAWIO_CONFIG = {
-  defaultCustomLibraries: ['Uhttps://tools.itblognote.com/draw-diagrams/js/personal/Personal.xml']
+  defaultCustomLibraries: ['U' + basePath + '/js/personal/Personal.xml']
 };
 urlParams['sync'] = 'manual';
+
