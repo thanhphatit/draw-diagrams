@@ -1,0 +1,1 @@
+draw-diagrams/stencils/personal/
