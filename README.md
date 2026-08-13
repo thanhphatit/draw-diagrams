@@ -1,4 +1,8 @@
-draw-diagrams/stencils/personal/Personal.xml
+js/personal/Personal.xml
+PreConfig.js
+
+
+
 /**
  * Copyright (c) 2006-2024, JGraph Ltd
  * Copyright (c) 2006-2024, draw.io AG
@@ -13,6 +17,6 @@ window.DRAWIO_LIGHTBOX_URL = null; // Replace with your lightbox URL, eg. https:
 window.DRAW_MATH_URL = 'math/es5';
 window.DRAWIO_CONFIG = null; // Replace with your custom draw.io configurations. For more details, https://www.drawio.com/doc/faq/configure-diagram-editor
 window.DRAWIO_CONFIG = {
-  defaultCustomLibraries: ['Ustencils/personal/Personal.xml']
+  defaultCustomLibraries: ['Uhttps://tools.itblognote.com/draw-diagrams/js/personal/Personal.xml']
 };
 urlParams['sync'] = 'manual';
