@@ -2,6 +2,14 @@ js/personal/Personal.xml
 PreConfig.js
 https://tools.itblognote.com/kit/image-to-base64/
 
+
+{
+    "data": "data:image/webp;base64,UklGRhweAABXRUJQVlA4WAoAAAAYAAAA/wAA/",
+    "w": 500,
+    "h": 500,
+    "title": "GitLab"
+},
+
 /**
  * Copyright (c) 2006-2024, JGraph Ltd
  * Copyright (c) 2006-2024, draw.io AG
