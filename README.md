@@ -1,6 +1,7 @@
 js/personal/Personal.xml
 PreConfig.js
 https://tools.itblognote.com/kit/image-to-base64/
+cloudflare icon filetype:png
 
 {
     "data": "data:image/webp;base64,UklGRhweAABXRUJQVlA4WAoAAAAYAAAA/wAA/",
