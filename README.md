@@ -9,6 +9,8 @@ https://tools.itblognote.com/kit/image-to-base64/
     "title": "GitLab"
 },
 
+
+
 /**
  * Copyright (c) 2006-2024, JGraph Ltd
  * Copyright (c) 2006-2024, draw.io AG
