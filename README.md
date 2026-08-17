@@ -2,7 +2,6 @@ js/personal/Personal.xml
 PreConfig.js
 https://tools.itblognote.com/kit/image-to-base64/
 
-
 {
     "data": "data:image/webp;base64,UklGRhweAABXRUJQVlA4WAoAAAAYAAAA/wAA/",
     "w": 500,
