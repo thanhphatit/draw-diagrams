@@ -1,6 +1,6 @@
 js/personal/Personal.xml
 PreConfig.js
-
+https://tools.itblognote.com/kit/image-to-base64/
 
 /**
  * Copyright (c) 2006-2024, JGraph Ltd
